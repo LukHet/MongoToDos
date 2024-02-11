@@ -1,5 +1,4 @@
 const { MongoClient, ObjectId } = require("mongodb");
-const mongo = require("mongodb");
 
 const url = "mongodb://localhost:27017";
 const client = new MongoClient(url, { family: 4 });
@@ -16,8 +15,30 @@ const addNewTodo = async (todosCollection, title) => {
     .catch((err) => console.log("Błąd dodawania", err));
 };
 
-const markTaskAsDone = (todosCollection, id) => {
-  todosCollection
+const markTaskAsDone = async (todosCollection, id) => {
+  let exit = false;
+  await todosCollection
+    .find({ _id: new ObjectId(id) })
+    .toArray()
+    .then((data) => {
+      if (data.length !== 1) {
+        console.log("Nie ma takiego zadania");
+        exit = true;
+        return;
+      }
+      if (data[0].done) {
+        console.log("To zadanie już zostało zakończone");
+        exit = true;
+        return;
+      }
+    })
+    .catch((err) => console.log("Błąd wyświetlania bazy", err));
+
+  if (exit == true) {
+    return;
+  }
+
+  await todosCollection
     .updateOne(
       {
         _id: new ObjectId(id),
@@ -32,6 +53,41 @@ const markTaskAsDone = (todosCollection, id) => {
       console.log("Udało zmienić status zadania na zrobiony ", msg)
     )
     .catch((err) => console.log("Błąd zmieniania statusu ", err));
+};
+
+const deleteAllDoneTasks = async (todosCollection) => {
+  await todosCollection
+    .deleteMany({
+      done: true,
+    })
+    .then((msg) => console.log("Wyczyszczono zrobione zadania ", msg))
+    .catch((err) => console.log("Błąd podczas usuwania ", err));
+};
+
+const deleteTask = async (todosCollection, id) => {
+  let exit = false;
+  await todosCollection
+    .find({ _id: new ObjectId(id) })
+    .toArray()
+    .then((data) => {
+      if (data.length !== 1) {
+        console.log("Nie ma takiego zadania");
+        exit = true;
+        return;
+      }
+    })
+    .catch((err) => console.log("Błąd wyświetlania bazy", err));
+
+  if (exit == true) {
+    return;
+  }
+
+  await todosCollection
+    .deleteOne({
+      _id: new ObjectId(id),
+    })
+    .then((msg) => console.log("Zadanie usunięte ", msg))
+    .catch((err) => console.log("Błąd podczas usuwania ", err));
 };
 
 const displayingTodos = (todosCollection) => {
@@ -74,6 +130,15 @@ const doTheToDo = async (todosCollection) => {
       break;
     case "done":
       await markTaskAsDone(todosCollection, args[0]);
+      break;
+    case "delete":
+      await deleteTask(todosCollection, args[0]);
+      break;
+    case "cleanup":
+      await deleteAllDoneTasks(todosCollection, args[0]);
+      break;
+    default:
+      console.log("Niepoprawna komenda");
       break;
   }
 };
